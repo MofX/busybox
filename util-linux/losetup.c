@@ -147,10 +147,25 @@ int losetup_main(int argc UNUSED_PARAM, char **argv)
 			d = *argv++;
 
 		if (argv[0]) {
+			struct stat statbuf;
+			int n;
 			unsigned flags = (opt & OPT_r) ? BB_LO_FLAGS_READ_ONLY : 0;
+
 			if (opt & OPT_P) {
 				flags |= BB_LO_FLAGS_PARTSCAN;
 			}
+
+			// If the loop device does not exist, create it
+			if (stat(d, &statbuf) != 0 && errno == ENOENT) {
+				if (sscanf(d, LOOP_FORMAT, &n) != 1) {
+					errno = 0;
+					bb_perror_msg_and_die("Loop device %s does not exist and does not start with " LOOP_NAME, d);
+				}
+				if (mknod(d, S_IFBLK|0644, makedev(7, n)) != 0) {
+					bb_simple_perror_msg_and_die(d);
+				}
+			}
+
 			if (set_loop(&d, argv[0], offset, flags) < 0)
 				bb_simple_perror_msg_and_die(argv[0]);
 			return EXIT_SUCCESS;
